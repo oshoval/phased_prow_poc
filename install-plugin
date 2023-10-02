@@ -1,0 +1,16 @@
+#!/bin/bash -xe
+
+# Usage:
+# ./install_plugin CNI_BIN_DST
+
+readonly CNI_BIN_SRC=/plugin-src/phased-prow
+
+function install_plugin() {
+    local cni_bin_dst="${1:?}"
+
+    cp "$CNI_BIN_SRC" "$cni_bin_dst"
+    chmod 755 "$cni_bin_dst"
+}
+
+install_plugin "$@"
+sleep infinity

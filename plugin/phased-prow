@@ -1,0 +1,89 @@
+#!/bin/bash
+
+readonly IP=169.255.0.0
+readonly SUBNET_MASK=24
+readonly GW_IP=169.255.0.1
+readonly CONTAINER_NETNS_LINK="/var/run/netns/$CNI_CONTAINERID"
+readonly LOGFILE=/var/log/phased_prow.log
+
+function main() {
+    case "$CNI_COMMAND" in
+        ADD)
+            log "Received ADD command. CNI_ARGS: $CNI_ARGS"
+            which jq > /dev/null 2>&1 || dnf install -y jq > /dev/null 2>&1
+            setup_netns
+            verify_phased_state
+            gen_result_config
+            ;;
+        DEL)
+            log "Received DEL command."
+            ip netns del "$CNI_CONTAINERID" ||:
+            ;;
+    esac
+}
+
+function setup_netns() {
+    # TODO do we need ?
+    mkdir -p /var/run/netns
+    ln -sfT "$CNI_NETNS" "$CONTAINER_NETNS_LINK"
+}
+
+function from_cni_args() {
+    local var_name="${1:?}"
+    sed -nE "s/.+?${var_name}=([^;]*?)(;.+?|$)/\1/p" <<< "$CNI_ARGS"
+}
+
+function verify_phased_state() {
+  K8S_POD_NAMESPACE="$(from_cni_args K8S_POD_NAMESPACE)"
+  K8S_POD_NAME="$(from_cni_args K8S_POD_NAME)"
+  PULL_NUMBER=$(kubectl --kubeconfig=/etc/kubernetes/admin.conf get pod -n $K8S_POD_NAMESPACE $K8S_POD_NAME -ojson | jq -r '.spec.containers[0].env[] | select(.name=="PULL_NUMBER").value')
+
+  # TODO validate GITHUB_TOKEN_FILE exists
+  GITHUB_TOKEN_FILE=${GITHUB_TOKEN_FILE:-/etc/github/oauth}
+  GITHUB_TOKEN="$(cat $GITHUB_TOKEN_FILE)"
+  OWNER="kubevirt"
+  REPO="kubevirt"
+
+  curl -sH "Authorization: token $GITHUB_TOKEN" \
+        -H "Accept: application/vnd.github.v3+json" \
+           "https://api.github.com/repos/$OWNER/$REPO/issues/$PULL_NUMBER/labels" | grep -Eq '"name": "approved"|"name": "lgtm"'
+
+  if [ $? != 0 ]; then
+     # log "labels not found for PR $PULL_NUMBER"
+     # TODO remove the bypass hack
+     [ ! -e "/etc/github/bypass" ] && exit 1
+  fi
+}
+
+function gen_result_config() {
+  local mac
+  mac="$(
+    ip netns exec "$CNI_CONTAINERID" ip link show "$CNI_IFNAME" | \
+        grep link | awk '{print $2}')"
+
+  tee -a "$LOGFILE" <<-EOF
+    {
+        "cniVersion": "0.3.1",
+        "interfaces": [
+          {
+            "name":"$CNI_IFNAME",
+            "mac": "$mac",
+            "sandbox": "$CNI_NETNS"
+          }
+        ],
+        "ips": [
+          {
+            "version": "4",
+            "address": "$IP/$SUBNET_MASK",
+            "interface": 0
+          }
+        ]
+    }
+EOF
+}
+
+function log {
+    echo "[$(date --rfc-3339=seconds)]: $*" >> "$LOGFILE"
+}
+
+main "$@"
