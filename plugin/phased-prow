@@ -41,8 +41,8 @@ function verify_phased_state() {
   # TODO validate GITHUB_TOKEN_FILE exists
   GITHUB_TOKEN_FILE=${GITHUB_TOKEN_FILE:-/etc/github/oauth}
   GITHUB_TOKEN="$(cat $GITHUB_TOKEN_FILE)"
-  OWNER="kubevirt"
-  REPO="kubevirt"
+  OWNER="oshoval"
+  REPO="phased_prow_poc"
 
   curl -sH "Authorization: token $GITHUB_TOKEN" \
         -H "Accept: application/vnd.github.v3+json" \

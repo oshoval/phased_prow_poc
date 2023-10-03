@@ -1,0 +1,75 @@
+name: Add Label on LGTM
+
+on:
+  issue_comment:
+    types:
+      - created
+
+jobs:
+  add_label:
+    if: ${{ github.event.issue.pull_request }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for /lgtm in the comment
+        if: contains(github.event.comment.body, '/lgtm') && ! contains(github.event.comment.body, '/lgtm cancel')
+        uses: actions/github-script@v6.4.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ["lgtm"]
+            });
+
+  remove_label:
+    if: ${{ github.event.issue.pull_request }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for /lgtm cancel in the comment
+        if: contains(github.event.comment.body, '/lgtm cancel')
+        uses: actions/github-script@v6.4.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.issues.removeLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              name: ["lgtm"]
+            });
+
+  add_approve_label:
+    if: ${{ github.event.issue.pull_request }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for /approve in the comment
+        if: contains(github.event.comment.body, '/approve') && ! contains(github.event.comment.body, '/approve cancel')
+        uses: actions/github-script@v6.4.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ["approve"]
+            });
+
+  remove_approve_label:
+    if: ${{ github.event.issue.pull_request }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for /approve cancel in the comment
+        if: contains(github.event.comment.body, '/approve cancel')
+        uses: actions/github-script@v6.4.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.issues.removeLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              name: ["approve"]
+            });
